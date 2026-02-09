@@ -20,13 +20,20 @@ function getRandomFileName(originalPath) {
  * @returns {Promise<{codePath: string, configPath: string}>}
  */
 async function createTempFiles(code, filePath, config) {
+
+
+  const hasConfig = config && JSON.stringify(config) !== '{}'
+
   const tempDir = dirname(filePath);
   const tempFileName = getRandomFileName(filePath);
   const codePath = join(tempDir, tempFileName);
-  const configPath = join(tempDir, `.oxlintrc.${tempFileName}.json`);
+
+  const configPath = hasConfig ? '' : join(tempDir, `.oxlintrc.${tempFileName}.json`);
 
   await fs.writeFile(codePath, code);
-  await fs.writeFile(configPath, JSON.stringify(config));
+  if (hasConfig) {
+    await fs.writeFile(configPath, JSON.stringify(config));
+  }
 
   return { codePath, configPath };
 }
@@ -38,14 +45,15 @@ async function createTempFiles(code, filePath, config) {
  * @returns {Promise<void>}
  */
 async function cleanupTempFiles(codePath, configPath) {
+
+  console.log([codePath, configPath]);
+  
   const filesToClean = [codePath, configPath].filter(Boolean);
-  
+
   if (filesToClean.length === 0) return;
-  
-  const results = await Promise.allSettled(
-    filesToClean.map(path => fs.unlink(path))
-  );
-  
+
+  const results = await Promise.allSettled(filesToClean.map(path => fs.unlink(path)));
+
   // Log failures but don't throw
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
@@ -83,24 +91,24 @@ export function mergeConfigs(optionsConfig, fileConfig) {
   if (!optionsConfig && !fileConfig) return {};
   if (!optionsConfig) return { ...fileConfig };
   if (!fileConfig) return { ...optionsConfig };
-  
+
   // Start with optionsConfig as base
   const merged = { ...optionsConfig };
-  
+
   // Deep merge for nested objects, fileConfig has priority
   for (const key in fileConfig) {
     if (fileConfig[key] && typeof fileConfig[key] === 'object' && !Array.isArray(fileConfig[key])) {
       // Deep merge for nested objects
       merged[key] = {
         ...(merged[key] || {}),
-        ...fileConfig[key]
+        ...fileConfig[key],
       };
     } else {
       // Direct override for primitives and arrays
       merged[key] = fileConfig[key];
     }
   }
-  
+
   return merged;
 }
 
@@ -123,6 +131,7 @@ export async function format(code, filePath, options = {}) {
 
   const mergedConfig = mergeConfigs(options, fileConfig);
 
+
   let tempFilePath = null;
   let tempConfigPath = null;
 
@@ -134,6 +143,9 @@ export async function format(code, filePath, options = {}) {
 
     // Run oxlint
     const fixedCode = await new Promise((resolve, reject) => {
+
+
+
       const args = ['--fix', '--config', tempConfigPath, tempFilePath];
 
       if (mergedConfig['deny-warnings']) {
@@ -153,7 +165,7 @@ export async function format(code, filePath, options = {}) {
         }
       });
 
-      process.on('error', (error) => {
+      process.on('error', error => {
         reject(error);
       });
     });

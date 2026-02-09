@@ -1,5 +1,4 @@
-import { estjs } from '@estjs/eslint-config';
-import pluginOxlintX from "../src"
+import pluginOxlintX from "./src/index.js"
 export default [
 
   {
@@ -12,5 +11,4 @@ export default [
       },
   },
   
-  ...estjs()
 ]

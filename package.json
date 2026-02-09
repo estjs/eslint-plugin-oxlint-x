@@ -33,7 +33,7 @@
   "scripts": {
     "dev": "node ./dist/index.mjs",
     "build": "unbuild",
-    "lint": "eslint ./src --fix",
+    "lint": "eslint --debug . --fix",
     "lint:oxlint": "node oxlint.all.js",
     "lint:oxlint:fix": "node oxlint.all.js --fix",
     "lint:oxlint:json": "node oxlint.all.js --format=json",
