@@ -45,7 +45,7 @@ describe('eSLint Plugin Oxlint Integration', () => {
 
     it('should have recommended config', () => {
       expect(eslintPluginOxlint.configs.recommended.rules).toEqual({
-        'oxlint-x/oxlint': 'warn',
+        'oxlint/oxlint': 'warn',
       });
     });
 

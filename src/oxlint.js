@@ -1,4 +1,3 @@
-import { createRequire } from 'node:module';
 import { createSyncFn } from 'synckit';
 import path, { dirname, join, } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,73 +6,24 @@ import { randomBytes } from 'node:crypto';
 import process from 'node:process';
 
 
-const require = createRequire(import.meta.url);
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const userDefinedOxlintPath = join(process.cwd(), 'node_modules', '.bin', 'oxlint');
 // use project temp path
 const TEMP_DIR_NAME = '.oxlint-temp';
 const TEMP_DIR_PATH = join(process.cwd(), 'node_modules', TEMP_DIR_NAME);
 
-/**
- * Resolves the path to the oxlint binary.
- * 
- * Resolution strategy (in priority order):
- * 1. User-defined path: {cwd}/node_modules/.bin/oxlint
- * 2. Package resolution: require.resolve('oxlint/package.json') → {pkg}/bin/oxlint
- * 3. Entry point resolution: require.resolve('oxlint') → traverse up to find bin/oxlint
- * 4. Local node_modules: {__dirname}/../node_modules/oxlint/bin/oxlint
- * 5. Fallback to PATH: 'oxlint'
- * 
- * @returns {string} Absolute path to oxlint binary, or 'oxlint' if not found
- */
+
 export function resolveOxlintBinary() {
-  // 1. Try user defined path (node_modules/.bin/oxlint in cwd)
-  try {
-    if (fs.existsSync(userDefinedOxlintPath)) {
-      return userDefinedOxlintPath;
-    }
-  } catch { }
+  if (fs.existsSync(userDefinedOxlintPath)) {
+    return userDefinedOxlintPath;
+  }
 
-  // 2. Try resolving oxlint package
-  try {
-    // Try to resolve package.json first
-    try {
-      // Attempt to find package.json of oxlint to confirm location
-      const pkgIoPath = require.resolve('oxlint/package.json', {
-        paths: [process.cwd(), __dirname],
-      });
-      const binPath = join(dirname(pkgIoPath), 'bin', 'oxlint');
-      if (fs.existsSync(binPath)) return binPath;
-    } catch { }
-
-    // Fallback to main entry point resolution if package.json is hidden
-    const entryPath = require.resolve('oxlint', { paths: [process.cwd(), __dirname] });
-    // entryPath is likely .../oxlint/dist/index.js
-    let current = dirname(entryPath);
-    // Go up until we find bin/oxlint or hit root
-    for (let i = 0; i < 4; i++) {
-      const check = join(current, 'bin', 'oxlint');
-      if (fs.existsSync(check)) return check;
-      current = dirname(current);
-    }
-  } catch { }
-
-  // 3. Fallback to local node_modules relative to this file (monorepo structure)
-  try {
-    const local = join(__dirname, '..', 'node_modules', 'oxlint', 'bin', 'oxlint');
-    if (fs.existsSync(local)) return local;
-  } catch { }
-
-  // 4. Fallback to PATH
-  return 'oxlint';
 }
 
 // Cache the oxlint binary path resolution
 const oxlintPath = resolveOxlintBinary();
 
-// Create synckit worker for executing oxlint
 const executeOxlintWorker = createSyncFn(
-  new URL('./oxlint-worker.js', import.meta.url).href
+  new URL(`./oxlint-worker.js`, import.meta.url).href
 );
 
 // Track temporary files for cleanup

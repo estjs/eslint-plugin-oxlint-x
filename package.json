@@ -23,17 +23,17 @@
     "dist"
   ],
   "main": "dist/index.cjs",
-  "module": "dist/index.mjs",
+  "module": "dist/index.js",
   "exports": {
     ".": {
       "require": "./dist/index.cjs",
-      "import": "./dist/index.mjs"
+      "import": "./dist/index.js"
     }
   },
   "sideEffects": false,
   "scripts": {
-    "dev": "node ./dist/index.mjs",
-    "build": "unbuild",
+    "dev": "node ./dist/index.js",
+    "build": "tsup",
     "lint": "eslint ./ --fix",
     "test": "vitest",
     "test:watch": "vitest --watch",
@@ -53,11 +53,11 @@
     "bumpp": "^10.1.1",
     "eslint": "^9.28.0",
     "execa": "^9.6.1",
-    "pnpm": "^10.29.2",
     "fast-glob": "^3.3.3",
     "fs-extra": "^11.3.3",
+    "pnpm": "^10.29.2",
+    "tsup": "^8.5.1",
     "typescript": "^5.8.3",
-    "unbuild": "^3.5.0",
     "vitest": "^3.2.0"
   },
   "engines": {
