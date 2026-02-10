@@ -1,98 +1,47 @@
-import pkg from '../package.json' with { type: 'json' };
-import { generateDifferences, showInvisibles } from './helper.js';
-import { format } from './oxlint.js';
+import { oxlint } from './rules.js';
 
-const { INSERT, DELETE, REPLACE } = generateDifferences;
-
-/**
- * Reports a difference.
- *
- * @param {import('eslint').Rule.RuleContext} context - The ESLint rule context.
- * @param {import('prettier-linter-helpers').Difference} difference - The difference object.
- * @returns {void}
- */
-function reportDifference(context, difference) {
-  const { operation, offset, deleteText = '', insertText = '' } = difference;
-  const range = [offset, offset + deleteText.length];
-  const [start, end] = range.map(index => context.sourceCode.getLocFromIndex(index));
-
-  context.report({
-    messageId: operation,
-    data: {
-      deleteText: showInvisibles(deleteText),
-      insertText: showInvisibles(insertText),
-    },
-    loc: { start, end },
-    fix: fixer => fixer.replaceTextRange(range, insertText),
-  });
-}
-
-const eslintPluginOxlint = {
-  meta: { name: pkg.name, version: pkg.version },
-  configs: {
-    recommended: {
-      plugins: ['oxlint'],
-      rules: {
-        'oxlint/oxlint': 'warn',
-      },
-    },
+const plugin = {
+  meta: {
+    name: 'eslint-plugin-oxlint-x',
+    version: '0.9.20',
   },
   rules: {
-    oxlint: {
-      meta: {
-        type: 'layout',
-        fixable: 'code',
-        docs: {
-          description: 'Format files with oxlint.',
-          recommended: 'warn',
-        },
-        messages: {
-          [INSERT]: 'Insert `{{ insertText }}`',
-          [DELETE]: 'Delete `{{ deleteText }}`',
-          [REPLACE]: 'Replace `{{ deleteText }}` with `{{ insertText }}`',
-        },
-        schema: [
-          {
-            type: 'object',
-            properties: {
-              'config': {
-                type: 'string',
-              },
-              'deny-warnings': {
-                type: 'boolean',
-              },
-            },
-            additionalProperties: false,
-          },
-        ],
+    oxlint,
+  },
+  configs: {
+    // Legacy config
+    'recommended': {
+      plugins: ['oxlint-x'],
+      rules: {
+        'oxlint-x/oxlint': 'warn',
       },
-      create(context) {
-        const options = context.options?.[0] || {};
-        const sourceCode = context.sourceCode ?? context.getSourceCode();
-        const filePath = context.filename ?? context.getFilename();
-        const source = sourceCode.text;
-
-        return {
-          async Program() {
-            try {
-              const formatted = await format(source, filePath, options);
-              if (source !== formatted) {
-                const differences = generateDifferences(source, formatted);
-                for (const difference of differences) {
-                  reportDifference(context, difference);
-                }
-              }
-            } catch (error) {
-              context.report({
-                message: `oxlint error: ${error.message}`,
-                loc: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
-              });
-            }
-          },
-        };
+    },
+    // Flat config
+    'flat/recommended': {
+      plugins: {
+        get 'oxlint-x'() {
+          return plugin;
+        },
+      },
+      rules: {
+        'oxlint-x/oxlint': 'warn',
       },
     },
   },
 };
 
-export default eslintPluginOxlint;
+export function estjs(items = {}, configs = {}) {
+  return [
+    {
+      plugins: {
+        'oxlint-x': plugin,
+      },
+      rules: {
+        'oxlint-x/oxlint': ['error', configs],
+      },
+      ...items,
+    },
+  ];
+}
+
+export default plugin;

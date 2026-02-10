@@ -1,178 +1,285 @@
-import { spawn } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
+import path, { dirname, join, } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promises as fs } from 'node:fs';
+import fs from 'node:fs';
 import { randomBytes } from 'node:crypto';
+import process from 'node:process';
 
+
+const require = createRequire(import.meta.url);
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const oxlintPath = join(__dirname, '..', 'node_modules', 'oxlint', 'bin', 'oxlint');
-
-function getRandomFileName(originalPath) {
-  const extension = originalPath.slice(originalPath.lastIndexOf('.'));
-  return `.oxlint-temp-${randomBytes(16).toString('hex')}${extension}`;
-}
+const userDefinedOxlintPath = join(process.cwd(), 'node_modules', '.bin', 'oxlint');
+// use project temp path
+const TEMP_DIR_NAME = '.oxlint-temp';
+const TEMP_DIR_PATH = join(process.cwd(), 'node_modules', TEMP_DIR_NAME);
 
 /**
- * Create temporary files for oxlint processing
- * @param {string} code - Source code
- * @param {string} filePath - Original file path
- * @param {object} config - Oxlint configuration
- * @returns {Promise<{codePath: string, configPath: string}>}
+ * Resolves the path to the oxlint binary.
+ * @returns {string} Path to the oxlint binary or 'oxlint' if not found.
  */
-async function createTempFiles(code, filePath, config) {
-
-
-  const hasConfig = config && JSON.stringify(config) !== '{}'
-
-  const tempDir = dirname(filePath);
-  const tempFileName = getRandomFileName(filePath);
-  const codePath = join(tempDir, tempFileName);
-
-  const configPath = hasConfig ? '' : join(tempDir, `.oxlintrc.${tempFileName}.json`);
-
-  await fs.writeFile(codePath, code);
-  if (hasConfig) {
-    await fs.writeFile(configPath, JSON.stringify(config));
-  }
-
-  return { codePath, configPath };
-}
-
-/**
- * Clean up temporary files
- * @param {string} codePath - Path to temporary code file
- * @param {string} configPath - Path to temporary config file
- * @returns {Promise<void>}
- */
-async function cleanupTempFiles(codePath, configPath) {
-
-  console.log([codePath, configPath]);
-  
-  const filesToClean = [codePath, configPath].filter(Boolean);
-
-  if (filesToClean.length === 0) return;
-
-  const results = await Promise.allSettled(filesToClean.map(path => fs.unlink(path)));
-
-  // Log failures but don't throw
-  results.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      console.warn(`Failed to clean up ${filesToClean[index]}: ${result.reason.message}`);
+export function resolveOxlintBinary() {
+  // 1. Try user defined path (node_modules/.bin/oxlint in cwd)
+  try {
+    if (fs.existsSync(userDefinedOxlintPath)) {
+      return userDefinedOxlintPath;
     }
-  });
+  } catch { }
+
+  // 2. Try resolving oxlint package
+  try {
+    // Try to resolve package.json first
+    try {
+      // Attempt to find package.json of oxlint to confirm location
+      const pkgIoPath = require.resolve('oxlint/package.json', {
+        paths: [process.cwd(), __dirname],
+      });
+      const binPath = join(dirname(pkgIoPath), 'bin', 'oxlint');
+      if (fs.existsSync(binPath)) return binPath;
+    } catch { }
+
+    // Fallback to main entry point resolution if package.json is hidden
+    const entryPath = require.resolve('oxlint', { paths: [process.cwd(), __dirname] });
+    // entryPath is likely .../oxlint/dist/index.js
+    let current = dirname(entryPath);
+    // Go up until we find bin/oxlint or hit root
+    for (let i = 0; i < 4; i++) {
+      const check = join(current, 'bin', 'oxlint');
+      if (fs.existsSync(check)) return check;
+      current = dirname(current);
+    }
+  } catch { }
+
+  // 3. Fallback to local node_modules relative to this file (monorepo structure)
+  try {
+    const local = join(__dirname, '..', 'node_modules', 'oxlint', 'bin', 'oxlint');
+    if (fs.existsSync(local)) return local;
+  } catch { }
+
+  // 4. Fallback to PATH
+  return 'oxlint';
 }
 
-async function findNearestOxlintrc(startPath) {
+// Cache the oxlint binary path resolution
+const oxlintPath = resolveOxlintBinary();
+
+// Simple LRU-like cache for config paths to avoid repeated disk access
+const configPathCache = new Map();
+
+/**
+ * Finds the nearest .oxlintrc.json configuration file.
+ * @param {string} startPath
+ * @returns {string|null} Path to the configuration file or null if not found.
+ */
+export function resolveOxlintConfigFile(startPath) {
+  const cached = configPathCache.get(startPath);
+  if (cached !== undefined) return cached;
+
   let currentDir = dirname(startPath);
   while (true) {
     const configPath = join(currentDir, '.oxlintrc.json');
     try {
-      await fs.access(configPath);
+      fs.accessSync(configPath);
+      configPathCache.set(startPath, configPath);
       return configPath;
     } catch {
       // Not found, go up
     }
     const parentDir = dirname(currentDir);
     if (parentDir === currentDir) {
-      return null; // Reached root
+      configPathCache.set(startPath, null);
+      return null;
     }
     currentDir = parentDir;
   }
 }
 
 /**
- * Merge configurations with proper priority and deep merge
- * @param {object} optionsConfig - Configuration from ESLint rule options
- * @param {object} fileConfig - Configuration from .oxlintrc.json
- * @returns {object} - Merged configuration with file config taking priority
+ * Ensures the temporary directory exists.
  */
-export function mergeConfigs(optionsConfig, fileConfig) {
-  // Handle null and undefined configurations
-  if (!optionsConfig && !fileConfig) return {};
-  if (!optionsConfig) return { ...fileConfig };
-  if (!fileConfig) return { ...optionsConfig };
-
-  // Start with optionsConfig as base
-  const merged = { ...optionsConfig };
-
-  // Deep merge for nested objects, fileConfig has priority
-  for (const key in fileConfig) {
-    if (fileConfig[key] && typeof fileConfig[key] === 'object' && !Array.isArray(fileConfig[key])) {
-      // Deep merge for nested objects
-      merged[key] = {
-        ...(merged[key] || {}),
-        ...fileConfig[key],
-      };
-    } else {
-      // Direct override for primitives and arrays
-      merged[key] = fileConfig[key];
-    }
+function ensureTempDir() {
+  if (!fs.existsSync(TEMP_DIR_PATH)) {
+    fs.mkdirSync(TEMP_DIR_PATH, { recursive: true });
   }
-
-  return merged;
 }
 
 /**
- * @param {string} code
- * @param {string} filePath
- * @param {object} options
- * @returns {Promise<string>}
+ * Writes content to a random temporary file.
+ * @param {string} content
+ * @param {string} originalFilePath
+ * @returns {string} Path to the created temp file
  */
-export async function format(code, filePath, options = {}) {
-  const realConfigPath = await findNearestOxlintrc(filePath);
-  let fileConfig = {};
-  if (realConfigPath) {
-    try {
-      fileConfig = JSON.parse(await fs.readFile(realConfigPath, 'utf-8'));
-    } catch {
-      /* ignore parse errors */
+function createTempFile(content, originalFilePath) {
+  const ext = originalFilePath ? originalFilePath.split('.').pop() : 'js';
+  const tempFileName = `${TEMP_DIR_NAME}-lint-${randomBytes(16).toString('hex')}.${ext}`;
+  const tempFilePath = join(TEMP_DIR_PATH, tempFileName);
+  fs.writeFileSync(tempFilePath, content);
+  return tempFilePath;
+}
+
+/**
+ * Writes config content to a random temporary file.
+ * @param {object} config
+ * @returns {string} Path to the created temp file
+ */
+export function createTempConfigFile(config) {
+  const tempFileName = `${TEMP_DIR_NAME}-config-${randomBytes(16).toString('hex')}.json`;
+  const tempFilePath = join(TEMP_DIR_PATH, tempFileName);
+  fs.writeFileSync(tempFilePath, JSON.stringify(config));
+  return tempFilePath;
+}
+
+/**
+ * Merges two configurations.
+ * @param {object} base
+ * @param {object} override
+ * @returns {object}
+ */
+export function mergeConfigs(base, override) {
+  if (!base) return override || {};
+  if (!override) return base || {};
+
+  const result = { ...base };
+  for (const key of Object.keys(override)) {
+    const valA = result[key];
+    const valB = override[key];
+    if (
+      typeof valA === 'object' &&
+      valA !== null &&
+      !Array.isArray(valA) &&
+      typeof valB === 'object' &&
+      valB !== null &&
+      !Array.isArray(valB)
+    ) {
+      result[key] = mergeConfigs(valA, valB);
+    } else {
+      result[key] = valB;
     }
   }
+  return result;
+}
 
-  const mergedConfig = mergeConfigs(options, fileConfig);
+/**
+ * Executes the oxlint command synchronously.
+ * @param {string[]} args
+ * @returns {string} Stdout of the command
+ */
+function executeOxlint(args, options = {}) {
+  const stdio = options.stdio || ['ignore', 'pipe', 'pipe'];
+  const cwd = options.cwd || process.cwd();
 
+  const result = spawnSync(oxlintPath, args, { stdio, cwd, encoding: 'utf-8' });
 
-  let tempFilePath = null;
-  let tempConfigPath = null;
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0 && result.stderr && !result.stdout) {
+    throw new Error(`Oxlint exited with code ${result.status}\nStderr: ${result.stderr}`);
+  }
+
+  return result.stdout || '';
+}
+
+/**
+ * Lint code using oxlint via temp file.
+ */
+export function lint(code, filePath, config = {}) {
+  ensureTempDir();
+  const cleanupTasks = [];
 
   try {
-    // Create temporary files
-    const tempFiles = await createTempFiles(code, filePath, mergedConfig);
-    tempFilePath = tempFiles.codePath;
-    tempConfigPath = tempFiles.configPath;
+    let finalConfig = config;
 
-    // Run oxlint
-    const fixedCode = await new Promise((resolve, reject) => {
-
-
-
-      const args = ['--fix', '--config', tempConfigPath, tempFilePath];
-
-      if (mergedConfig['deny-warnings']) {
-        args.push('--deny-warnings');
+    const realConfigPath = resolveOxlintConfigFile(filePath);
+    if (realConfigPath) {
+      try {
+        const fileContent = fs.readFileSync(realConfigPath, 'utf-8');
+        const fileConfig = JSON.parse(fileContent);
+        finalConfig = mergeConfigs(fileConfig, config);
+      } catch (e) {
+        // Ignore error if config file is invalid, just use inline config
       }
+    }
 
-      const process = spawn(oxlintPath, args, {
-        stdio: 'inherit',
-      });
+    const tempFilePath = createTempFile(code, filePath);
+    cleanupTasks.push(() => fs.unlinkSync(tempFilePath));
 
-      process.on('close', async () => {
-        try {
-          const fixedCode = await fs.readFile(tempFilePath, 'utf-8');
-          resolve(fixedCode);
-        } catch (error) {
-          reject(error);
-        }
-      });
+    const cwd = dirname(tempFilePath);
+    const args = [
+      '--format=json',
+      '--no-ignore',
+      path.basename(tempFilePath),
+    ];
 
-      process.on('error', error => {
-        reject(error);
-      });
-    });
+    if (finalConfig && Object.keys(finalConfig).length > 0) {
+      const mergedConfigPath = createTempConfigFile(finalConfig);
+      cleanupTasks.push(() => fs.unlinkSync(mergedConfigPath));
+      // Use the merged config
+      args.push('--config', mergedConfigPath);
+    } else if (realConfigPath) {
+      // Should not strictly happen if we merge with empty inline config, but as fallback
+      args.push('--config', realConfigPath);
+    }
 
-    return fixedCode;
+    const stdout = executeOxlint(args, { cwd });
+    try {
+      return stdout.trim() ? JSON.parse(stdout) : { diagnostics: [] };
+    } catch (error) {
+      throw new Error(`Failed to parse oxlint output: ${error.message}\nOutput: ${stdout}`);
+    }
   } finally {
-    // Always clean up temporary files
-    await cleanupTempFiles(tempFilePath, tempConfigPath);
+    for (const task of cleanupTasks) {
+      try {
+        task();
+      } catch { }
+    }
+  }
+}
+
+/**
+ * Format code using oxlint (requires --fix).
+ */
+export function format(code, filePath, config = {}) {
+  ensureTempDir();
+  const cleanupTasks = [];
+
+  try {
+    let finalConfig = config;
+    const realConfigPath = resolveOxlintConfigFile(filePath);
+
+    if (realConfigPath) {
+      try {
+        const fileContent = fs.readFileSync(realConfigPath, 'utf-8');
+        const fileConfig = JSON.parse(fileContent);
+        finalConfig = mergeConfigs(fileConfig, config);
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    // Prepare temp file for code
+    const tempFilePath = createTempFile(code, filePath);
+    cleanupTasks.push(() => fs.unlinkSync(tempFilePath));
+
+    const cwd = dirname(tempFilePath);
+    const args = ['--fix', path.basename(tempFilePath)];
+
+    if (finalConfig && Object.keys(finalConfig).length > 0) {
+      const mergedConfigPath = createTempConfigFile(finalConfig);
+      cleanupTasks.push(() => fs.unlinkSync(mergedConfigPath));
+      args.push('--config', mergedConfigPath);
+    } else if (realConfigPath) {
+      args.push('--config', realConfigPath);
+    }
+
+    executeOxlint(args, { stdio: 'ignore', cwd });
+    return fs.readFileSync(tempFilePath, 'utf-8');
+  } finally {
+    for (const task of cleanupTasks) {
+      try {
+        task();
+      } catch { }
+    }
   }
 }

@@ -1,107 +1,79 @@
-# eslint-plugin-oxlint
+# eslint-plugin-oxlint-x
 
-ESLint plugin that integrates oxlint (a high-performance Rust-based linter) into ESLint workflows.
+[English](README.md) | [中文](README_zh-CN.md)
 
-## Requirements
+---
 
-- Node.js >= 18.0.0
-- ESLint >= 9.0.0
-- oxlint (installed separately)
+Runs [Oxlint](https://oxc-project.github.io/docs/guide/usage/linter.html) as an ESLint rule. This allows you to integrate Oxlint's fast linting capabilities directly into your ESLint workflow, including support for `eslint --fix`.
 
-## Installation
+### Features
+
+- **Integration**: Runs `oxlint` as a standard ESLint rule.
+- **Auto-fix**: Supports `eslint --fix` to automatically apply Oxlint fixes.
+- **Configuration**: Supports `.oxlintrc.json` configuration files and ESLint rule options.
+- **Performance**: Leverages Oxlint's speed for heavy lifting linting tasks.
+
+### Installation
 
 ```bash
-npm install --save-dev eslint-plugin-oxlint
+npm install eslint-plugin-oxlint-x oxlint -D
+# or
+pnpm add eslint-plugin-oxlint-x oxlint -D
+# or
+yarn add eslint-plugin-oxlint-x oxlint -D
 ```
 
-## Usage
+### Usage
 
-### ESLint Flat Config (eslint.config.js)
+#### Flat Config (ESLint v9+)
 
 ```javascript
-import oxlint from 'eslint-plugin-oxlint';
+// eslint.config.js
+import oxlint from 'eslint-plugin-oxlint-x';
+
+export default [
+  // ... other configs
+  oxlint.configs.recommended,
+];
+```
+
+Or manual configuration:
+
+```javascript
+import oxlintPlugin from 'eslint-plugin-oxlint-x';
 
 export default [
   {
     plugins: {
-      oxlint
+      'oxlint-x': oxlintPlugin,
     },
     rules: {
-      'oxlint/oxlint': 'error'
-    }
-  }
+      // Priority is higher than auto-reading .oxlintrc.json, can override .oxlintrc.json configuration
+      'oxlint-x/oxlint': ['error', {
+        // oxlint config
+      }], 
+    },
+  },
 ];
 ```
 
-### ESLint Legacy Config (.eslintrc.json)
+#### Auto-read Configuration
 
 ```json
 {
-  "plugins": ["oxlint"],
+  "plugins": ["oxlint-x"],
   "rules": {
-    "oxlint/oxlint": "error"
+    // Automatically reads and uses .oxlintrc.json configuration
+    "oxlint-x/oxlint": "warn"
   }
 }
 ```
 
-## Configuration Options
 
-The `oxlint/oxlint` rule accepts the following options:
 
-- `useOxlintrc` (boolean, default: `true`): Whether to load `.oxlintrc.json` configuration file
-- `oxlintConfig` (object): Direct oxlint configuration to use
-- `oxlintPath` (string): Custom path to oxlint executable
+### How it Works
 
-### Example with Options
+1. **Linting**: When ESLint runs, this plugin spawns an `oxlint` process for the file being linted.
+2. **Reporting**: Diagnostics from Oxlint are translated into ESLint messages.
+3. **Fixing**: When `eslint --fix` is triggered, issues that are auto-fixable by Oxlint will be applied.
 
-```javascript
-{
-  rules: {
-    'oxlint/oxlint': ['error', {
-      useOxlintrc: true,
-      oxlintConfig: {
-        rules: {
-          'no-unused-vars': 'error'
-        }
-      },
-      oxlintPath: '/custom/path/to/oxlint'
-    }]
-  }
-}
-```
-
-## Development
-
-### Setup
-
-```bash
-npm install
-```
-
-### Build
-
-```bash
-npm run build
-```
-
-### Test
-
-```bash
-npm test
-```
-
-### Test with Coverage
-
-```bash
-npm run test:coverage
-```
-
-### Lint
-
-```bash
-npm run lint
-```
-
-## License
-
-MIT
