@@ -99,7 +99,7 @@ process.on('exit', () => {
  */
 export function resolveOxlintConfigFile(startPath) {
   let currentDir = dirname(startPath);
-  
+
   while (true) {
     const configPath = join(currentDir, '.oxlintrc.json');
     try {
@@ -108,7 +108,7 @@ export function resolveOxlintConfigFile(startPath) {
     } catch {
       // Not found, go up
     }
-    
+
     const parentDir = dirname(currentDir);
     if (parentDir === currentDir) {
       // Reached filesystem root
@@ -261,7 +261,7 @@ export function lint(code, filePath, config = {}) {
       try {
         const fileContent = fs.readFileSync(realConfigPath, 'utf-8');
         const fileConfig = JSON.parse(fileContent);
-        finalConfig = mergeConfigs(fileConfig, config);
+        finalConfig = mergeConfigs(config, fileConfig);
       } catch (e) {
         // Ignore error if config file is invalid, just use inline config
         console.warn('[eslint-plugin-oxlint-x] Invalid config file:', e.message);
@@ -322,7 +322,7 @@ export function format(code, filePath, config = {}) {
       try {
         const fileContent = fs.readFileSync(realConfigPath, 'utf-8');
         const fileConfig = JSON.parse(fileContent);
-        finalConfig = mergeConfigs(fileConfig, config);
+        finalConfig = mergeConfigs(config, fileConfig);
       } catch (e) {
         // Ignore invalid config
         console.warn('[eslint-plugin-oxlint-x] Invalid config file:', e.message);
