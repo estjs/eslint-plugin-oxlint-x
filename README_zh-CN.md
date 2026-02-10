@@ -28,18 +28,6 @@ yarn add eslint-plugin-oxlint-x oxlint -D
 #### Flat Config (ESLint v9+)
 
 ```javascript
-// eslint.config.js
-import oxlint from 'eslint-plugin-oxlint-x';
-
-export default [
-  // ... 其他配置
-  oxlint.configs.recommended,
-];
-```
-
-或者手动配置：
-
-```javascript
 import oxlintPlugin from 'eslint-plugin-oxlint-x';
 
 export default [
@@ -70,9 +58,3 @@ export default [
 ```
 
 
-
-### 工作原理
-
-1. **Linting**: 当 ESLint 运行时，此插件会对正在检查的文件生成 `oxlint` 进程。
-2. **报告**: Oxlint 的诊断信息会被转换为 ESLint 消息。
-3. **修复**: 当触发 `eslint --fix` 时，Oxlint 可自动修复的问题将被应用。

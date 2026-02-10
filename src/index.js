@@ -1,5 +1,11 @@
 import { oxlint } from './rules.js';
 
+/**
+ * ESLint plugin for integrating Oxlint linter.
+ * Provides rules and configurations for using Oxlint within ESLint.
+ * 
+ * @type {import('eslint').ESLint.Plugin}
+ */
 const plugin = {
   meta: {
     name: 'eslint-plugin-oxlint-x',
@@ -30,6 +36,23 @@ const plugin = {
   },
 };
 
+/**
+ * Helper function to create ESLint flat config with Oxlint integration.
+ * 
+ * @param {object} items - Additional ESLint config items to merge
+ * @param {object} configs - Oxlint configuration options (plugins, rules, etc.)
+ * @returns {Array<object>} ESLint flat config array
+ * 
+ * @example
+ * import { estjs } from 'eslint-plugin-oxlint-x';
+ * 
+ * export default estjs({
+ *   files: ['**\/*.js'],
+ * }, {
+ *   plugins: ['typescript'],
+ *   rules: { 'no-debugger': 'error' }
+ * });
+ */
 export function estjs(items = {}, configs = {}) {
   return [
     {

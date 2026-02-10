@@ -14,6 +14,9 @@ importers:
       oxlint:
         specifier: '>=1.3.0'
         version: 1.43.0
+      synckit:
+        specifier: ^0.11.12
+        version: 0.11.12
     devDependencies:
       '@estjs/eslint-config':
         specifier: ^2.0.5

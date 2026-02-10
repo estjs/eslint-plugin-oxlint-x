@@ -28,18 +28,6 @@ yarn add eslint-plugin-oxlint-x oxlint -D
 #### Flat Config (ESLint v9+)
 
 ```javascript
-// eslint.config.js
-import oxlint from 'eslint-plugin-oxlint-x';
-
-export default [
-  // ... other configs
-  oxlint.configs.recommended,
-];
-```
-
-Or manual configuration:
-
-```javascript
 import oxlintPlugin from 'eslint-plugin-oxlint-x';
 
 export default [
@@ -69,11 +57,4 @@ export default [
 }
 ```
 
-
-
-### How it Works
-
-1. **Linting**: When ESLint runs, this plugin spawns an `oxlint` process for the file being linted.
-2. **Reporting**: Diagnostics from Oxlint are translated into ESLint messages.
-3. **Fixing**: When `eslint --fix` is triggered, issues that are auto-fixable by Oxlint will be applied.
 

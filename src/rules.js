@@ -1,6 +1,29 @@
 import diff from 'fast-diff';
 import { format, lint } from './oxlint.js';
 
+/**
+ * ESLint rule that integrates Oxlint linter and formatter.
+ * 
+ * This rule performs two operations:
+ * 1. Linting: Reports diagnostics from Oxlint
+ * 2. Formatting: Provides auto-fixes for formatting issues
+ * 
+ * Configuration is passed directly to Oxlint and should follow the Oxlint
+ * configuration schema. See: https://oxc.rs/docs/guide/usage/linter/config-file-reference.html
+ * 
+ * @example
+ * // ESLint config
+ * {
+ *   rules: {
+ *     'oxlint/oxlint': ['error', {
+ *       plugins: ['typescript'],
+ *       rules: { 'no-debugger': 'error' }
+ *     }]
+ *   }
+ * }
+ * 
+ * @type {import('eslint').Rule.RuleModule}
+ */
 export const oxlint = {
   meta: {
     type: 'problem',
@@ -17,6 +40,12 @@ export const oxlint = {
       },
     ],
   },
+  /**
+   * Creates the ESLint rule implementation.
+   * 
+   * @param {import('eslint').Rule.RuleContext} context - ESLint rule context
+   * @returns {object} Rule visitor object with Program handler
+   */
   create(context) {
     const sourceCode = context.sourceCode;
     const filePath = context.filename;
@@ -27,6 +56,10 @@ export const oxlint = {
     }
 
     return {
+      /**
+       * Program visitor that runs Oxlint on the entire file.
+       * Processes both linting diagnostics and formatting fixes.
+       */
       Program() {
         const code = sourceCode.getText();
         try {
