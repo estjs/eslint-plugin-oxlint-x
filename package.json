@@ -2,6 +2,7 @@
   "name": "eslint-plugin-oxlint-x",
   "version": "0.0.0",
   "description": "",
+  "packageManager": "pnpm@10.29.2",
   "type": "module",
   "keywords": [
     "eslint-plugin",
@@ -52,6 +53,7 @@
     "bumpp": "^10.1.1",
     "eslint": "^9.28.0",
     "execa": "^9.6.1",
+    "pnpm": "^10.29.2",
     "fast-glob": "^3.3.3",
     "fs-extra": "^11.3.3",
     "typescript": "^5.8.3",
