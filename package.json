@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-oxlint-x",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "",
   "packageManager": "pnpm@10.29.2",
   "type": "module",
