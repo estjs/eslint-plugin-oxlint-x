@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-oxlint-x",
-  "version": "0.9.20",
+  "version": "0.0.0",
   "description": "",
   "type": "module",
   "keywords": [
@@ -34,9 +34,6 @@
     "dev": "node ./dist/index.mjs",
     "build": "unbuild",
     "lint": "eslint ./ --fix",
-    "lint:oxlint": "node oxlint.all.js",
-    "lint:oxlint:fix": "node oxlint.all.js --fix",
-    "lint:oxlint:json": "node oxlint.all.js --format=json",
     "test": "vitest",
     "test:watch": "vitest --watch",
     "release": "pnpm run build && bumpp package.json  --no-git-checks --commit --push --tag && pnpm publish --access public"
