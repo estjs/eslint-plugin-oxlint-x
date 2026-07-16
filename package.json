@@ -50,7 +50,7 @@
     "@estjs/eslint-config": "^2.0.5",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^25.2.2",
-    "bumpp": "^10.1.1",
+    "bumpp": "^11.0.0",
     "eslint": "^9.28.0",
     "execa": "^9.6.1",
     "fast-glob": "^3.3.3",
