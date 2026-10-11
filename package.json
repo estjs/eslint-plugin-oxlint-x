@@ -44,7 +44,7 @@
   },
   "dependencies": {
     "fast-diff": "^1.3.0",
-    "synckit": "^0.11.12"
+    "synckit": "^0.12.0"
   },
   "devDependencies": {
     "@estjs/eslint-config": "^2.0.5",
